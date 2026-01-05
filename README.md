@@ -5,8 +5,6 @@
 **5ENTINEL (S.H.I.E.L.D)** 은 현대적인 클라우드(AWS/EKS) 환경을 보호하기 위해 설계된 차세대 통합 보안 관제 플랫폼임.
 단순한 모니터링을 넘어 런타임 행위 탐지(Falco), 정적/동적 파일 분석(YARA/Cuckoo), SOAR 자동 대응(Step Functions), 그리고 **AI 분석 지능(Gemini)** 이 하나로 결합된 Full-Stack 보안 응대 시스템을 제공함.
 
-![Dashboard Preview](./dashboard/dashboard_preview.png)
-
 ---
 
 ## 핵심 기능 (Core Features)
@@ -25,6 +23,8 @@
 *   **Runtime Detection**: EKS 컨테이너 내부의 비정상적인 시스템 콜(쉘 실행, 민감 파일 접근 등)을 실시간으로 포착함.
 *   **SOAR Logic**: 위협 탐지 즉시 AWS Step Functions를 호출하여 해당 Pod를 격리(NetworkPolicy)하거나 강제 종료함.
 *   **Fast-Path**: 고위험 탐지 시 리소스 낭비를 방지하기 위해 샌드박스 분석을 생략하고 즉시 차단하는 최적화 경로를 제공함.
+
+![Dashboard Preview](./dashboard/dashboard_preview.png)
 
 ---
 
