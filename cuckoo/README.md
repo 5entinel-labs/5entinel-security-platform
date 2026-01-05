@@ -1,7 +1,7 @@
 # AI & Cuckoo Analysis Bridge (`bridge.py`)
 
 이 스크립트는 **S.H.I.E.L.D Sentinel** 플랫폼의 핵심 분석 엔진(Core Analysis Engine)임. 
-S3에 업로드된 의심 파일을 자동으로 수집하여 **정적 분석(YARA)**과 **동적 분석(Cuckoo Sandbox)**을 수행하고, **Gemini AI**를 통해 결과를 요약하여 대시보드와 디스코드로 전송함.
+S3에 업로드된 의심 파일을 자동으로 수집하여 **정적 분석(YARA)** 과 **동적 분석(Cuckoo Sandbox)** 을 수행하고, **Gemini AI**를 통해 결과를 요약하여 대시보드와 디스코드로 전송함.
 
 ## 주요 기능
 
