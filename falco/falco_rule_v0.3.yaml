@@ -1,0 +1,346 @@
+# =========================
+# Project Exec Ruleset v0.3 test
+# - Keep v0.1 behavior classification (PRJ_EXEC_*)
+# - Add DVWA upload/artifact capture (ARTIFACT_*)
+# Target: enable artifact extraction pipeline (S3/Collector) by emitting artifact_path
+# =========================
+
+# ---- Scoping / helper macros ----
+- macro: prj_scope
+  condition: >
+    (container and not k8s.ns.name in (kube-system, kube-public, kube-node-lease, falco, fluent-bit, external-dns))
+
+# Optional placeholders for later tuning
+- macro: prj_exec_allowlist
+  condition: (never_true)
+
+# ---- DVWA-specific scope ----
+- macro: dvwa_scope
+  condition: >
+    container and k8s.ns.name=dvwa
+
+- macro: dvwa_upload_dir
+  condition: fd.name startswith /var/www/html/hackable/uploads/
+
+- list: dvwa_suspicious_ext
+  items: [.php, .phtml, .php3, .php4, .php5, .phar, .sh, .bash, .py, .pl, .rb, .so]
+
+- list: dvwa_archive_ext
+  items: [.zip, .tar, .gz, .tgz]
+
+- list: dvwa_webserver_procs
+  items: [apache2, httpd, nginx, php-fpm, php, fpm-fcgi]
+
+# ---- Shared lists (v0.1 kept) ----
+- list: prj_shells
+  items: [sh, bash, ash, dash, zsh]
+
+- list: prj_recon_bins
+  items: [id, whoami, uname, ps, top, env, printenv, ls, cat, find, grep, egrep, fgrep,
+          ip, ifconfig, ss, netstat, route, ping, traceroute, nslookup, dig,
+          curl, wget]
+
+- list: prj_cred_search_bins
+  items: [cat, find, grep, egrep, fgrep, sed, awk, perl, python, python3]
+
+- list: prj_dropper_bins
+  items: [sh, bash, curl, wget, nc, ncat, socat, python, python3, perl, php, ruby, base64]
+
+- list: prj_archive_bins
+  items: [tar, gzip, gunzip, zip, unzip, xz, bzip2]
+
+- list: prj_remote_exec_bins
+  items: [nc, ncat, socat, bash, sh, python, python3, perl, php, ruby]
+
+# =========================
+# DVWA ARTIFACT RULES (NEW)
+# =========================
+- rule: DVWA Webserver Outbound Connect (exit) attacker ip/port
+  desc: High-signal outbound connect from webserver process in DVWA; extracts attacker ip/port (SOAR).
+  condition: >
+    container and k8s.ns.name=dvwa and
+    evt.type=connect and evt.dir=< and
+    fd.type in (ipv4, ipv6) and
+    proc.name in (apache2, httpd, nginx, php, php-fpm, fpm-fcgi) and
+    fd.rip exists and fd.rport exists and fd.rport > 0 and
+    (fd.rip != "0.0.0.0" and fd.rip != "127.0.0.1")
+  output: >
+    ARTIFACT_Reverse_Shell_Suspected! Attacker_IP: %fd.rip Attacker_Port: %fd.rport Local_Port: %fd.lport User: %user.name
+    Command: %proc.cmdline Full_Connection: %fd.name proc=%proc.name parent=%proc.pname
+    pod=%k8s.pod.name ns=%k8s.ns.name container=%container.name container_id=%container.id
+  priority: CRITICAL
+  tags: [dvwa, webshell, network, mitre_c2, ip_extract, soar_block]
+
+
+- rule: DVWA DEBUG any connect (show proc/ip/port)
+  desc: Temporary debug rule to confirm connect events and identify the process making the connection.
+  condition: >
+    container and k8s.ns.name=dvwa and
+    evt.type=connect and
+    fd.type in (ipv4, ipv6)
+  output: >
+    [DEBUG] CONNECT evt_dir=%evt.dir proc=%proc.name parent=%proc.pname cmd=%proc.cmdline
+    rip=%fd.rip rport=%fd.rport lip=%fd.lip lport=%fd.lport fd=%fd.name
+    pod=%k8s.pod.name ns=%k8s.ns.name container=%container.name
+  priority: DEBUG
+  tags: [dvwa, debug, network]
+
+
+- rule: DVWA Upload Dir Suspicious Ext Written
+  desc: Detect writing likely scripts/binaries into DVWA uploads directory (high-signal).
+  condition: >
+    open_write
+    and dvwa_scope
+    and dvwa_upload_dir
+    and (
+      fd.name endswith .php or fd.name endswith .phtml or fd.name endswith .php3 or
+      fd.name endswith .php4 or fd.name endswith .php5 or fd.name endswith .phar or
+      fd.name endswith .sh or fd.name endswith .bash or
+      fd.name endswith .py or fd.name endswith .pl or fd.name endswith .rb or
+      fd.name endswith .so
+    )
+  output: >
+    ARTIFACT_WRITE_SUSP_EXT reason=upload_write_suspicious_ext artifact_path=%fd.name
+    proc=%proc.name cmdline=%proc.cmdline user=%user.name
+    container=%container.name container_id=%container.id
+    pod=%k8s.pod.name ns=%k8s.ns.name node=%evt.hostname
+  priority: WARNING
+  tags: [project, dvwa, artifact, filesystem, webshell]
+
+- rule: DVWA Upload Dir Archive Written
+  desc: Detect archive files written into DVWA uploads directory (zip/tar/gz).
+  condition: >
+    open_write
+    and dvwa_scope
+    and dvwa_upload_dir
+    and (
+      fd.name endswith .zip or fd.name endswith .tar or
+      fd.name endswith .gz or fd.name endswith .tgz
+    )
+  output: >
+    ARTIFACT_WRITE_ARCHIVE reason=upload_write_archive artifact_path=%fd.name
+    proc=%proc.name cmdline=%proc.cmdline user=%user.name
+    container=%container.name container_id=%container.id
+    pod=%k8s.pod.name ns=%k8s.ns.name node=%evt.hostname
+  priority: WARNING
+  tags: [project, dvwa, artifact, filesystem, archive]
+  
+- rule: DVWA Upload Dir File Write
+  desc: Detect any file opened for writing under DVWA uploads directory (upload/drop stage).
+  condition: >
+    open_write
+    and dvwa_scope
+    and dvwa_upload_dir
+  output: >
+    ARTIFACT_WRITE reason=upload_write artifact_path=%fd.name
+    proc=%proc.name cmdline=%proc.cmdline user=%user.name
+    container=%container.name container_id=%container.id
+    pod=%k8s.pod.name ns=%k8s.ns.name node=%evt.hostname
+  priority: NOTICE
+  tags: [project, dvwa, artifact, filesystem, write]
+
+- rule: DVWA Upload Dir Chmod
+  desc: Detect chmod/fchmod on files inside DVWA uploads directory.
+  condition: >
+    evt.type in (chmod, fchmod, fchmodat)
+    and dvwa_scope
+    and (
+      fd.name startswith /var/www/html/hackable/uploads/ or
+      evt.arg.filename startswith /var/www/html/hackable/uploads/
+    )
+  output: >
+    ARTIFACT_CHMOD reason=chmod artifact_path=%evt.arg.filename 
+    proc=%proc.name cmdline=%proc.cmdline user=%user.name 
+    container=%container.name container_id=%container.id 
+    pod=%k8s.pod.name ns=%k8s.ns.name node=%evt.hostname
+  priority: NOTICE
+  tags: [project, dvwa, artifact, filesystem, chmod]
+
+- rule: DVWA Execute From Upload Dir
+  desc: Detect execution referencing DVWA uploads directory (strong artifact trigger).
+  condition: >
+    evt.type in (execve, execveat) and dvwa_scope and
+    ( proc.exepath startswith /var/www/html/hackable/uploads/
+      or proc.cmdline contains "/var/www/html/hackable/uploads/" )
+  exceptions:
+    - name: quarantine_mitigation
+      fields: [proc.cmdline]
+      comps: [startswith]
+      values:
+        - ["sh -c set -e; if [ ! -f '/var/www/html/hackable/uploads/"]
+  output: >
+    ARTIFACT_EXEC reason=exec_from_upload_dir exepath=%proc.exepath cmdline=%proc.cmdline
+    container=%container.name container_id=%container.id pod=%k8s.pod.name ns=%k8s.ns.name
+    node=%evt.hostname user=%user.name
+  priority: WARNING
+  tags: [project, dvwa, artifact, exec]
+
+
+- rule: DVWA Webserver Spawns Shell
+  desc: Shell spawned by common webserver/php processes in dvwa namespace (webshell/RCE indicator).
+  condition: >
+    evt.type in (execve, execveat)
+    and dvwa_scope
+    and proc.name in (sh, bash, dash, ash)
+    and proc.pname in (dvwa_webserver_procs)
+  output: >
+    ARTIFACT_WEBSHELL reason=webserver_spawns_shell parent=%proc.pname proc=%proc.name cmdline=%proc.cmdline
+    container=%container.name container_id=%container.id
+    pod=%k8s.pod.name ns=%k8s.ns.name node=%evt.hostname user=%user.name
+  priority: CRITICAL
+  tags: [project, dvwa, webshell, exec]
+
+- rule: DVWA Download Tool Writes To Upload Dir
+  desc: wget/curl commands referencing DVWA uploads directory (payload fetch into web path).
+  condition: >
+    evt.type in (execve, execveat)
+    and dvwa_scope
+    and proc.name in (wget, curl)
+    and proc.cmdline contains "/var/www/html/hackable/uploads/"
+  output: >
+    ARTIFACT_FETCH_TO_UPLOAD reason=download_to_upload_dir cmdline=%proc.cmdline
+    container=%container.name container_id=%container.id
+    pod=%k8s.pod.name ns=%k8s.ns.name node=%evt.hostname user=%user.name
+  priority: WARNING
+  tags: [project, dvwa, artifact, download]
+
+# =======================================
+# PRJ EXEC RULES (v0.1 kept, minor cleanup)
+# =======================================
+
+- rule: PRJ Exec Shell Interactive
+  desc: Interactive shell in container (tty attached; likely kubectl exec -it).
+  condition: >
+    evt.type in (execve, execveat)
+    and prj_scope
+    and proc.name in (prj_shells)
+    and proc.tty != 0
+    and not prj_exec_allowlist
+  output: >
+    PRJ_EXEC_INTERACTIVE proc=%proc.name cmdline=%proc.cmdline user=%user.name
+    container=%container.name container_id=%container.id
+    pod=%k8s.pod.name ns=%k8s.ns.name node=%evt.hostname tty=%proc.tty
+  priority: WARNING
+  tags: [project, exec, interactive]
+  
+- rule: PRJ Exec Shell (Audit)
+  desc: Shell executed inside a container (baseline auditing).
+  condition: >
+    evt.type in (execve, execveat)
+    and prj_scope
+    and proc.name in (prj_shells)
+    and not prj_exec_allowlist
+  output: >
+    PRJ_EXEC_AUDIT proc=%proc.name cmdline=%proc.cmdline user=%user.name
+    container=%container.name container_id=%container.id
+    pod=%k8s.pod.name ns=%k8s.ns.name node=%evt.hostname tty=%proc.tty
+  priority: NOTICE
+  tags: [project, exec, audit]
+
+- rule: PRJ Exec Recon
+  desc: Recon/enumeration style commands executed in container.
+  condition: >
+    evt.type in (execve, execveat)
+    and prj_scope
+    and proc.name in (prj_recon_bins)
+    and not prj_exec_allowlist
+  output: >
+    PRJ_EXEC_RECON proc=%proc.name cmdline=%proc.cmdline user=%user.name
+    container=%container.name container_id=%container.id
+    pod=%k8s.pod.name ns=%k8s.ns.name node=%evt.hostname
+  priority: WARNING
+  tags: [project, exec, recon]
+
+- rule: PRJ Exec Credential Search
+  desc: Potential credential search patterns (AWS/K8s token/SSH keys).
+  condition: >
+    evt.type in (execve, execveat)
+    and prj_scope
+    and proc.name in (prj_cred_search_bins)
+    and (
+      proc.cmdline contains ".aws/credentials" or
+      proc.cmdline contains "AWS_ACCESS_KEY_ID" or
+      proc.cmdline contains "AWS_SECRET_ACCESS_KEY" or
+      proc.cmdline contains "BEGIN OPENSSH PRIVATE KEY" or
+      proc.cmdline contains "BEGIN RSA PRIVATE KEY" or
+      proc.cmdline contains "/var/run/secrets/kubernetes.io/serviceaccount/token" or
+      proc.cmdline contains "kubeconfig" or
+      proc.cmdline contains "id_rsa" or
+      proc.cmdline contains "id_ed25519"
+    )
+    and not prj_exec_allowlist
+  output: >
+    PRJ_EXEC_CRED proc=%proc.name cmdline=%proc.cmdline user=%user.name
+    container=%container.name container_id=%container.id
+    pod=%k8s.pod.name ns=%k8s.ns.name node=%evt.hostname
+  priority: WARNING
+  tags: [project, exec, credential_access]
+
+- rule: PRJ Exec Fetch And Run
+  desc: Fetch-and-execute patterns (curl/wget | sh, bash -c with download).
+  condition: >
+    evt.type in (execve, execveat)
+    and prj_scope
+    and (
+      (proc.name in (curl, wget) and (proc.cmdline contains "http://" or proc.cmdline contains "https://")) or
+      (proc.name in (prj_shells) and (
+          proc.cmdline contains "curl " or
+          proc.cmdline contains "wget " or
+          proc.cmdline contains "| sh" or
+          proc.cmdline contains "|bash" or
+          proc.cmdline contains "bash -c" or
+          proc.cmdline contains "sh -c"
+      ))
+    )
+    and not prj_exec_allowlist
+  output: >
+    PRJ_EXEC_FETCHRUN proc=%proc.name cmdline=%proc.cmdline user=%user.name
+    container=%container.name container_id=%container.id
+    pod=%k8s.pod.name ns=%k8s.ns.name node=%evt.hostname
+  priority: WARNING
+  tags: [project, exec, dropper]
+
+- rule: PRJ Exec From Tmp Paths
+  desc: Execution involving suspicious temp paths (/dev/shm or /tmp).
+  condition: >
+    evt.type in (execve, execveat)
+    and prj_scope
+    and (
+      proc.exepath startswith "/dev/shm/" or
+      proc.exepath startswith "/tmp/" or
+      proc.cmdline contains "/dev/shm/" or
+      proc.cmdline contains "/tmp/"
+    )
+    and not prj_exec_allowlist
+  output: >
+    PRJ_EXEC_TMP proc=%proc.name exepath=%proc.exepath cmdline=%proc.cmdline user=%user.name
+    container=%container.name container_id=%container.id
+    pod=%k8s.pod.name ns=%k8s.ns.name node=%evt.hostname
+  priority: WARNING
+  tags: [project, exec, tmp]
+
+
+- rule: PRJ Exec Archive/Staging
+  desc: Archive/compress commands that often precede data staging/exfil.
+  condition: >
+    evt.type in (execve, execveat)
+    and prj_scope
+    and proc.name in (prj_archive_bins)
+    and not prj_exec_allowlist
+  output: >
+    PRJ_EXEC_ARCHIVE proc=%proc.name cmdline=%proc.cmdline user=%user.name
+    container=%container.name container_id=%container.id
+    pod=%k8s.pod.name ns=%k8s.ns.name node=%evt.hostname
+  priority: NOTICE
+  tags: [project, exec, staging]
+
+- rule: DVWA upload dir file move
+  desc: Detect files moved into DVWA upload directory (tmp->uploads pattern)
+  condition: >
+    (evt.type in (rename, renameat, renameat2))
+    and k8s.ns.name = "dvwa"
+    and fs.path.target startswith "/var/www/html/hackable/uploads/"
+  output: >
+    DVWA_UPLOAD_MOVE src=%fs.path.source dst=%fs.path.target proc=%proc.name cmdline=%proc.cmdline user=%user.name container=%container.name pod=%k8s.pod.name ns=%k8s.ns.name
+  priority: NOTICE
+  tags: [filesystem, upload, dvwa]
