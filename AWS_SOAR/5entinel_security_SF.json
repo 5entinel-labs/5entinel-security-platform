@@ -1,0 +1,380 @@
+{
+  "Comment": "Falco Incident Pipeline with File Delay, Reverse Shell NACL Egress Deny & Notification",
+  "StartAt": "ClassifyEvent",
+  "States": {
+    "ClassifyEvent": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Or": [
+            {
+              "And": [
+                {
+                  "Variable": "$.falco.log",
+                  "IsPresent": true
+                },
+                {
+                  "Or": [
+                    {
+                      "Variable": "$.falco.log",
+                      "StringMatches": "*DVWA_UPLOAD_MOVE*"
+                    },
+                    {
+                      "Variable": "$.falco.log",
+                      "StringMatches": "*ARTIFACT_WRITE*"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "And": [
+                {
+                  "Variable": "$.falco.raw_message.log",
+                  "IsPresent": true
+                },
+                {
+                  "Or": [
+                    {
+                      "Variable": "$.falco.raw_message.log",
+                      "StringMatches": "*DVWA_UPLOAD_MOVE*"
+                    },
+                    {
+                      "Variable": "$.falco.raw_message.log",
+                      "StringMatches": "*ARTIFACT_WRITE*"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "Next": "ExtractFileToS3"
+        },
+        {
+          "Or": [
+            {
+              "And": [
+                {
+                  "Variable": "$.falco.log",
+                  "IsPresent": true
+                },
+                {
+                  "Or": [
+                    {
+                      "Variable": "$.falco.log",
+                      "StringMatches": "*PRJ_EXEC_INTERACTIVE*"
+                    },
+                    {
+                      "Variable": "$.falco.log",
+                      "StringMatches": "*PRJ_EXEC_RECON*"
+                    },
+                    {
+                      "Variable": "$.falco.log",
+                      "StringMatches": "*ARTIFACT_WEBSHELL*"
+                    },
+                    {
+                      "Variable": "$.falco.log",
+                      "StringMatches": "*ARTIFACT_EXEC*"
+                    },
+                    {
+                      "Variable": "$.falco.log",
+                      "StringMatches": "*ARTIFACT_Reverse_Shell_Suspected!*"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "And": [
+                {
+                  "Variable": "$.falco.raw_message.log",
+                  "IsPresent": true
+                },
+                {
+                  "Or": [
+                    {
+                      "Variable": "$.falco.raw_message.log",
+                      "StringMatches": "*PRJ_EXEC_INTERACTIVE*"
+                    },
+                    {
+                      "Variable": "$.falco.raw_message.log",
+                      "StringMatches": "*PRJ_EXEC_RECON*"
+                    },
+                    {
+                      "Variable": "$.falco.raw_message.log",
+                      "StringMatches": "*ARTIFACT_WEBSHELL*"
+                    },
+                    {
+                      "Variable": "$.falco.raw_message.log",
+                      "StringMatches": "*ARTIFACT_EXEC*"
+                    },
+                    {
+                      "Variable": "$.falco.log",
+                      "StringMatches": "*ARTIFACT_Reverse_Shell_Suspected!*"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "Next": "CheckSeverityForSOAR"
+        }
+      ],
+      "Default": "BuildIncidentS3Key"
+    },
+    "ExtractFileToS3": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:us-east-1:475411231143:function:5entinel_file_extract",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$.file_extract",
+      "Next": "DelaySuspiciousFile"
+    },
+    "DelaySuspiciousFile": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:us-east-1:475411231143:function:5entinel_file_delay",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$.file_delay",
+      "Next": "CheckSeverityForSOAR"
+    },
+    "CheckSeverityForSOAR": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Or": [
+            {
+              "And": [
+                {
+                  "Variable": "$.falco.log",
+                  "IsPresent": true
+                },
+                {
+                  "Variable": "$.falco.log",
+                  "StringMatches": "*ARTIFACT_Reverse_Shell_Suspected!*"
+                }
+              ]
+            },
+            {
+              "And": [
+                {
+                  "Variable": "$.falco.raw_message.log",
+                  "IsPresent": true
+                },
+                {
+                  "Variable": "$.falco.raw_message.log",
+                  "StringMatches": "*ARTIFACT_Reverse_Shell_Suspected!*"
+                }
+              ]
+            }
+          ],
+          "Next": "ParseReverseShellIoC"
+        },
+        {
+          "Or": [
+            {
+              "And": [
+                {
+                  "Variable": "$.falco.log",
+                  "IsPresent": true
+                },
+                {
+                  "Variable": "$.falco.log",
+                  "StringMatches": "*ARTIFACT_WEBSHELL*"
+                }
+              ]
+            },
+            {
+              "And": [
+                {
+                  "Variable": "$.falco.raw_message.log",
+                  "IsPresent": true
+                },
+                {
+                  "Variable": "$.falco.raw_message.log",
+                  "StringMatches": "*ARTIFACT_WEBSHELL*"
+                }
+              ]
+            }
+          ],
+          "Next": "ExecuteSoarResponse"
+        },
+        {
+          "Or": [
+            {
+              "And": [
+                {
+                  "Variable": "$.falco.log",
+                  "IsPresent": true
+                },
+                {
+                  "Variable": "$.falco.log",
+                  "StringMatches": "*ARTIFACT_EXEC*"
+                }
+              ]
+            },
+            {
+              "And": [
+                {
+                  "Variable": "$.falco.raw_message.log",
+                  "IsPresent": true
+                },
+                {
+                  "Variable": "$.falco.raw_message.log",
+                  "StringMatches": "*ARTIFACT_EXEC*"
+                }
+              ]
+            }
+          ],
+          "Next": "AskForApproval"
+        },
+        {
+          "Or": [
+            {
+              "And": [
+                {
+                  "Variable": "$.falco.log",
+                  "IsPresent": true
+                },
+                {
+                  "Or": [
+                    {
+                      "Variable": "$.falco.log",
+                      "StringMatches": "*PRJ_EXEC_INTERACTIVE*"
+                    },
+                    {
+                      "Variable": "$.falco.log",
+                      "StringMatches": "*PRJ_EXEC_RECON*"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "And": [
+                {
+                  "Variable": "$.falco.raw_message.log",
+                  "IsPresent": true
+                },
+                {
+                  "Or": [
+                    {
+                      "Variable": "$.falco.raw_message.log",
+                      "StringMatches": "*PRJ_EXEC_INTERACTIVE*"
+                    },
+                    {
+                      "Variable": "$.falco.raw_message.log",
+                      "StringMatches": "*PRJ_EXEC_RECON*"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "Next": "AskForApproval"
+        }
+      ],
+      "Default": "BuildIncidentS3Key"
+    },
+    "ParseReverseShellIoC": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:us-east-1:475411231143:function:5entinel_parse_reverse_shell_ioc",
+        "Payload.$": "$.falco"
+      },
+      "ResultPath": "$.reverse_shell",
+      "Next": "AddNaclOutboundDenyRule"
+    },
+    "AddNaclOutboundDenyRule": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:us-east-1:475411231143:function:5entinel_nacl_egress_deny_add",
+        "Payload": {
+          "attacker_ip.$": "$.reverse_shell.Payload.attacker_ip",
+          "attacker_port.$": "$.reverse_shell.Payload.attacker_port",
+          "falco.$": "$.falco"
+        }
+      },
+      "ResultPath": "$.nacl_result",
+      "Next": "BuildIncidentS3Key"
+    },
+    "AskForApproval": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:us-east-1:475411231143:function:5entinel_ask_approval",
+        "Payload": {
+          "token.$": "$$.Task.Token",
+          "falco.$": "$.falco"
+        }
+      },
+      "ResultPath": "$.admin_result",
+      "Next": "CheckAdminDecision"
+    },
+    "CheckAdminDecision": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.admin_result.action",
+          "StringEquals": "block",
+          "Next": "ExecuteSoarResponse"
+        }
+      ],
+      "Default": "BuildIncidentS3Key"
+    },
+    "ExecuteSoarResponse": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:us-east-1:475411231143:function:5entinel_node_isolate",
+        "Payload": {
+          "node_name.$": "$.falco.kubernetes.host"
+        }
+      },
+      "ResultPath": "$.soar_result",
+      "Next": "BuildIncidentS3Key"
+    },
+    "BuildIncidentS3Key": {
+      "Type": "Pass",
+      "Parameters": {
+        "bucket": "5entinel-security-bucket",
+        "key.$": "States.Format('incidents/{}/{}.json', $$.Execution.StartTime, $$.Execution.Name)",
+        "body.$": "States.JsonToString($)"
+      },
+      "ResultPath": "$.s3",
+      "Next": "PutIncidentToS3"
+    },
+    "PutIncidentToS3": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:s3:putObject",
+      "Parameters": {
+        "Bucket.$": "$.s3.bucket",
+        "Key.$": "$.s3.key",
+        "Body.$": "$.s3.body",
+        "ContentType": "application/json"
+      },
+      "ResultPath": "$.s3.putObjectResult",
+      "Next": "SendDiscordReport"
+    },
+    "SendDiscordReport": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:us-east-1:475411231143:function:5entinel_siem_discord",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$.discord_result",
+      "Next": "Done"
+    },
+    "Done": {
+      "Type": "Succeed"
+    }
+  },
+  "TimeoutSeconds": 300
+}
