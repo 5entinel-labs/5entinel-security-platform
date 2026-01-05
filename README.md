@@ -1,132 +1,137 @@
-# 5ENTINEL: Integrated Security & Automated Response Platform
+# 5ENTINEL: Cloud-Native SOC Platform
+> **AWS EKS 환경을 위한 실시간 보안 관제 및 자동 대응(SOAR) 플랫폼** > **KT Cloud TECH UP 사이버 보안 과정 1기 프로젝트 최종 결과물**
 
-**클라우드 네이티브 통합 SOC 및 실시간 위협 대응 생태계**
+![Dashboard Preview](./dashboard/dashboard_preview.png)
 
-**5ENTINEL (S.H.I.E.L.D)** 은 현대적인 클라우드(AWS/EKS) 환경을 보호하기 위해 설계된 차세대 통합 보안 관제 플랫폼임.
-단순한 모니터링을 넘어 런타임 행위 탐지(Falco), 정적/동적 파일 분석(YARA/Cuckoo), SOAR 자동 대응(Step Functions), 그리고 **AI 분석 지능(Gemini)** 이 하나로 결합된 Full-Stack 보안 응대 시스템을 제공함.
+<br/>
 
----
+## 1. 프로젝트 개요 (Project Overview)
+본 프로젝트는 **클라우드 네이티브(AWS EKS)** 환경에서 발생하는 보안 위협을 실시간으로 탐지하고 대응하기 위해 구축된 **Full-Stack 보안 관제 시스템**임.
+<br>
 
-## 핵심 기능 (Core Features)
+**Falco**를 이용해 런타임 위협을 탐지하고, **YARA/Cuckoo**를 통해 하이브리드 멀웨어 분석을 수행하며, **Gemini AI**가 분석 결과를 요약하여 보안 담당자의 의사결정을 도움. 또한 **AWS Step Functions**를 활용해 탐지된 위협에 대한 자동 격리 및 차단 조치를 수행함.
 
-### 1. 실시간 위협 통합 관제 (Unified Monitoring)
+* **개발 기간**: 2025.12 ~ 2026.01
+* **핵심 목표**: 런타임 위협 탐지부터 분석, 대응까지의 **전 과정 자동화 및 시각화**
+
+<br/>
+
+## 2. 기술 스택 (Tech Stack)
+
+| Category | Technology |
+| --- | --- |
+| **Compute & Container** | ![AWS EKS](https://img.shields.io/badge/AWS_EKS-FF9900?style=flat-square&logo=amazoncks&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) ![Lambda](https://img.shields.io/badge/AWS_Lambda-FF9900?style=flat-square&logo=awslambda&logoColor=white) |
+| **Security & Monitor** | ![Falco](https://img.shields.io/badge/Falco-00AEC7?style=flat-square&logo=falco&logoColor=white) ![YARA](https://img.shields.io/badge/YARA-CC0000?style=flat-square) ![Cuckoo Sandbox](https://img.shields.io/badge/Cuckoo_Sandbox-008000?style=flat-square) |
+| **Orchestration** | ![AWS Step Functions](https://img.shields.io/badge/Step_Functions-FF4F8B?style=flat-square&logo=amazonaws&logoColor=white) ![CloudWatch](https://img.shields.io/badge/CloudWatch-FF4F8B?style=flat-square&logo=amazonaws&logoColor=white) |
+| **AI Intelligence** | ![Google Gemini](https://img.shields.io/badge/Gemini_AI-8E75B2?style=flat-square&logo=google&logoColor=white) |
+| **Frontend** | ![React](https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black) ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white) |
+
+<br/>
+
+## 3. 핵심 기능 (Key Features)
+
+### 1) 실시간 위협 탐지 (Runtime Detection)
+**Cloud-Native 런타임 보안 도구인 Falco**를 EKS Daemonset으로 배포하여 시스템 콜 레벨의 위협을 실시간 감지함.
+
 *   **Threat Radar**: 위협 점수(Threat Score)를 기반으로 파일 및 런타임 위협을 레이더 화면에 실시간 시각화함.
 *   **Emergency Mode**: 활성 사고(Falco 탐지) 발생 시 대시보드 전체 UI가 즉시 붉은색 점멸 긴급 모드로 전환되어 분석가의 인지를 도움.
 *   **Pipeline Tracking**: 탐지부터 분석, 격리, 보고까지 이어지는 전체 보안 파이프라인의 진행 상태를 실시간 트래킹함.
 
-### 2. 하이브리드 인텔리전스 분석 (Malware Intelligence)
-*   **Static Analysis (YARA)**: 파일 유입 즉시 로컬 엔진을 통해 악성 시그니처, API 패턴, 오프셋 정보를 정밀 스캔함.
-*   **Dynamic Analysis (Cuckoo)**: 가상 샌드박스 환경에서 파일의 실제 행위(네트워크 연결, 파일 조작 등)를 추적하여 위험도를 산출함.
-*   **AI Summary (Gemini)**: 복잡한 원본 로그를 AI가 분석하여 분석가에게 최적화된 "식별-위험-대응" 3단계 국문 요약 리포트를 제공함.
+<br>
 
-### 3. 클라우드 네이티브 자동화 대응 (Falco & SOAR)
-*   **Runtime Detection**: EKS 컨테이너 내부의 비정상적인 시스템 콜(쉘 실행, 민감 파일 접근 등)을 실시간으로 포착함.
-*   **SOAR Logic**: 위협 탐지 즉시 AWS Step Functions를 호출하여 해당 Pod를 격리(NetworkPolicy)하거나 강제 종료함.
-*   **Fast-Path**: 고위험 탐지 시 리소스 낭비를 방지하기 위해 샌드박스 분석을 생략하고 즉시 차단하는 최적화 경로를 제공함.
+### 2) 하이브리드 자동 분석 (Automated Analysis)
+탐지된 의심 파일은 **분석 브릿지(Bridge Engine)**를 통해 정적/동적 분석이 수행됨.
 
-![Dashboard Preview](./dashboard/dashboard_preview.png)
+| 분석 엔진 | 역할 및 기능 |
+| :--- | :--- |
+| **YARA (Static)** | • **Signature Matching**: 커스텀 룰셋을 기반으로 알려진 악성코드 패턴 및 문자열 신속 탐지<br>• **Local Scan**: 파일 내부의 API 호출 패턴 및 의심스러운 헤더 정보 추출 |
+| **Cuckoo (Dynamic)** | • **Behavior Monitoring**: 격리된 샌드박스 환경에서 파일 실행<br>• **Trace Analysis**: 실제 발생하는 네트워크 연결, 파일 생성, 레지스트리 조작 행위 추적 |
+| **Gemini AI** | • **Intel Summary**: 복잡한 YARA/Cuckoo 로그를 분석하여 **"3줄 요약"** 리포트 생성 (식별-위험-대응) |
 
----
+### 3) 자동 대응 및 시각화 (SOAR & Dashboard)
+* **AWS Step Functions**: 탐지된 Pod를 즉시 격리(`Labeling`)하거나 강제 종료(`Force Delete`)하는 워크플로우 자동 실행함
+* **Dashboard Visualization**:
+    * **Threat Radar**: 위협 점수에 따른 실시간 레이더 차트 시각화
+    * **Emergency Mode**: 활성 위협 감지 시 붉은색 테마 전환으로 긴급 상황 전파함
 
-## 검증된 공격 시나리오 (Validated Attack Scenarios)
+    ---
 
-본 시스템은 실제 공격 기법을 시뮬레이션하여 방어 유효성을 검증했음.
+### 4) 검증된 공격 시나리오 (Validated Attack Scenarios)
 
-### 1. Reverse Shell & Evasion
+본 시스템은 실제 공격 기법을 시뮬레이션하여 방어 유효성을 검증함.
+
+#### 1. Reverse Shell & Evasion
 *   공격자가 웹 취약점을 통해 내부 침투 후 C2 서버로의 역접속을 시도함.
 *   단순한 연결뿐만 아니라 우회 기법(Evasion)을 시도했으나, Falco 커스텀 룰을 통해 프로세스 트리와 네트워크 소켓 생성을 상관 분석하여 탐지함.
 
-### 2. DVWA Web Exploitation
+#### 2. DVWA Web Exploitation
 *   DVWA를 타겟으로 자동화된 봇 공격 및 웹쉘 업로드 공격을 수행함.
 *   웹 서버 프로세스가 쉘을 스폰하거나 비정상적인 경로에 파일을 쓰는 행위를 행위 기반으로 탐지함.
 
-### 3. Container Privilege Escalation
+#### 3. Container Privilege Escalation
 *   침투한 컨테이너 내부에서 권한 상승을 시도함.
 *   탐지 즉시 SOAR가 트리거되어 해당 Pod를 네트워크 격리하거나 강제 종료함.
 
----
 
-## 시스템 아키텍처 (Architecture)
+<br/>
 
-대시보드는 S3 버킷의 데이터를 이원화하여 관리하며, 각 엔진이 실시간으로 상태 정보를 갱신하는 구조임.
+## 4. 시스템 아키텍처 (Architecture)
 
-*   **latest.json**: YARA/Cuckoo 파일 분석 결과 및 AI 리포트 데이터
-*   **status.json**: Falco 실시간 사고 및 SOAR 자동 대응 현황 데이터
+1.  **Detection**: EKS 내부의 **Falco**가 시스템 콜을 감지하여 Sidekick을 통해 로그 전송함
+2.  **Collection**: CloudWatch Logs로 수집된 로그가 Lambda 트리거함
+3.  **Automation**: **AWS Step Functions**가 대응 로직 실행 및 상태 갱신함 (`status.json`)
+4.  **Analysis**: 의심 파일은 S3 격리 버킷으로 전송되어 **Cuckoo/YARA** 분석 수행함 (`latest.json`)
+5.  **Visualization**: 대시보드는 S3의 데이터를 폴링하여 실시간 현황 표시함
 
-```mermaid
-graph TD
-    User[Attacker/User] -->|Attack/Upload| Infrastructure
-    
-    subgraph "Detect & Respond (SOAR)"
-        Infrastructure -->|Runtime Alert| Falco[Falco]
-        Falco -->|Webhook| SOAR[AWS Step Functions]
-        SOAR -->|Mitigation| Infrastructure
-    end
-    
-    subgraph "Hybrid Analysis"
-        Infrastructure -->|Sample| S3_Q[(S3 Quarantine)]
-        S3_Q -->|Poll| Bridge[Analysis Bridge]
-        Bridge -->|Static| YARA
-        Bridge -->|Dynamic| Sandbox[Cuckoo Sandbox]
-        Bridge -->|Interpret| AI[Gemini AI]
-    end
+<br/>
 
-    Bridge -->|latest.json| S3_D[(S3 Dashboard)]
-    SOAR -->|status.json| S3_D
-    S3_D -->|Dual Polling| Dashboard[Unified Dashboard]
-```
-
----
-
-## 프로젝트 구조 (Repository Structure)
-
-```text
+## 5. 프로젝트 구조 (Project Structure)
+```code
 5entinel-platform/
 ├── dashboard/           # React 기반 통합 관제 프론트엔드 (S3 호스팅)
-├── cuckoo/              # 분석 브릿지 엔진 (bridge.py, YARA 연동)
-├── falco/               # 런타임 보안 정책 및 FalcoSidekick 설정
-└── test/             
+├── cuckoo/              # 분석 브릿지 엔진 (bridge.py - YARA/AI 통합)
+├── falco/               # Falco 커스텀 룰(Rules) 및 Helm 설정
+└── test/                # 테스트 파일
 ```
 
----
+<br/>
 
-## 기술 스택 (Tech Stack)
+## 6. 설치 및 실행 (Getting Started)
 
-| 구분 | 기술 스택 |
-| :--- | :--- |
-| **Frontend** | React.js, Tailwind CSS, Lucide Icons |
-| **Analysis** | YARA (Static), Cuckoo Sandbox (Dynamic) |
-| **Cloud** | AWS (EKS, S3, CloudWatch, Lambda, Step Functions) |
-| **Security** | Falco (Runtime), Kubernetes NetworkPolicy |
-| **AI** | Google Gemini 2.5 Flash API |
-| **Languages** | Python (Bridge), JavaScript (UI), YARA Language |
+### Prerequisites
+* AWS 계정 및 EKS 클러스터
+* Python 3.9+ (분석 엔진용)
+* Cuckoo Sandbox 서버
 
----
+### Installation
 
-## 주요 설정 (Configuration)
+1.  **Frontend (Dashboard) 실행**
+    ```bash
+    cd dashboard
+    python3 -m http.server 8000
+    ```
+    브라우저에서 `http://localhost:8000` 접속
 
-플랫폼 전체 연동을 위해 다음 환경 변수 및 설정 확인이 필요함.
+2.  **Backend (Analysis Engine) 실행**
+    ```bash
+    cd cuckoo
+    pip install -r requirements.txt
+    python bridge.py
+    ```
 
-*   **AWS S3**: `dashboard-index` (데이터 저장소), `quarantine-cuckoo` (샘플 수집)
-*   **Gemini API**: `bridge.py` 내 Google AI Studio API 키 설정
-*   **Discord**: 실시간 알림 연동을 위한 Webhook URL 지정
-*   **EKS Falco**: Sidekick Webhook 주소를 브릿지 서버 엔드포인트로 연결
+<br/>
 
----
-
-## 팀원 소개 (Team)
+## 7. 팀원 소개 (Team)
 
 | 이름 | 역할 (Role) | 주요 기여 및 담당 파트 (Key Contributions) |
 | :---: | :---: | :--- |
 | **이영주** | **Team Leader** | (작성 필요) |
-| **신유주** | Member | Cuckoo Sandbox 서버 구축 및 gemini 기반 분석 요약 자동화 연동, 대시보드 설계/구현, 분석 브릿지 개발 및 S3 기반 데이터 파이프라인 구축 |
-| **이영광** | Member | QA 및 유닛 테스트(Unit Test) 검증 |
-| **이재일** | Member | 아키텍처 설계, Falco 설정, 리버스 쉘 공격 시나리오 설계 |
-| **홍정수** | Member | 오픈소스 YARA 룰 활용 및 탐지 자동화 구현, 스크립트(PHP 리버스쉘/PowerShell) 난독화 탐지 |
+| **신유주** | **Member** | • Cuckoo Sandbox 구축 및 Gemini AI 분석 요약 자동화 연동<br>• 대시보드 UI/UX 설계<br>• 분석 브릿지 개발 및 S3 기반 데이터 파이프라인 구축 |
+| **이재일** | **Member** | • Falco 런타임 보안 설정 및 아키텍처 설계<br>• 리버스 쉘, 권한 상승 등 핵심 공격 시나리오 설계 및 검증 |
+| **이영광** | **Member** | • QA 수행 및 Unit Test 수행 |
+| **홍정수** | **Member** | • 오픈소스 YARA 룰 최적화 및 탐지 자동화 구현<br>• PHP 리버스 셸 및 PowerShell 스크립트 난독화 탐지 룰 개발 |
+
+<br>
 
 ---
-
-## 라이선스 (License)
-
-본 프로젝트는 보안 교육 및 모니터링 연구 목적으로 제작되었음.
-MIT License를 따름.
+MIT License © 2026 5ENTINEL Team
