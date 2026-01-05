@@ -96,32 +96,8 @@
 
 <br/>
 
-## 6. 설치 및 실행 (Getting Started)
 
-### Prerequisites
-* AWS 계정 및 EKS 클러스터
-* Python 3.9+ (분석 엔진용)
-* Cuckoo Sandbox 서버
-
-### Installation
-
-1.  **Frontend (Dashboard) 실행**
-    ```bash
-    cd dashboard
-    python3 -m http.server 8000
-    ```
-    브라우저에서 `http://localhost:8000` 접속
-
-2.  **Backend (Analysis Engine) 실행**
-    ```bash
-    cd cuckoo
-    pip install -r requirements.txt
-    python bridge.py
-    ```
-
-<br/>
-
-## 7. 팀원 소개 (Team)
+## 6. 팀원 소개 (Team)
 
 | 이름 | 역할 (Role) | 주요 기여 및 담당 파트 (Key Contributions) |
 | :---: | :---: | :--- |
