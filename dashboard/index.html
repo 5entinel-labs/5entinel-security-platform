@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.H.I.E.L.D - Threat Response System</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Rajdhani:wght@500;600;700;800&family=Inter:wght@400;600&family=Noto+Sans+KR:wght@300;400;500;700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-deep: #030014;
+            --primary: #00f0ff;
+            --secondary: #7000ff;
+            --alert: #ff003c;
+            --success: #00ff9f;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: #e0e0e0;
+            font-family: 'Rajdhani', 'Noto Sans KR', sans-serif;
+            overflow: hidden;
+        }
+
+        /* Grid Background */
+        .cyber-grid {
+            background-size: 40px 40px;
+            background-image:
+                linear-gradient(to right, rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+            perspective: 1000px;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', 'Noto Sans KR', monospace;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+
+        /* Animations */
+        @keyframes radar-spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .radar-sweep {
+            background: conic-gradient(from 0deg, transparent 0deg, rgba(0, 240, 255, 0.1) 60deg, rgba(0, 240, 255, 0.4) 90deg, transparent 91deg);
+            animation: radar-spin 4s linear infinite;
+            border-radius: 50%;
+        }
+
+        .glass-box {
+            background: rgba(10, 12, 25, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+        }
+    </style>
+</head>
+
+<body class="h-screen w-screen relative">
+    <div class="fixed inset-0 cyber-grid z-[-1]"></div>
+    <div class="fixed inset-0 bg-gradient-to-t from-black via-transparent to-transparent z-[-1]"></div>
+
+    <div id="root" class="h-full flex flex-col p-4 gap-4"></div>
+
+    <script type="text/babel">
+        // --- CONSTANTS ---
+        const BUCKET_NAME = "dashboard-index";
+        const REGION = "us-east-1";
+        const DATA_URL = `https://${BUCKET_NAME}.s3.${REGION}.amazonaws.com/latest.json`;
+        const STATUS_URL = `https://${BUCKET_NAME}.s3.${REGION}.amazonaws.com/status.json`;
+
+        const { useState, useEffect, useRef } = React;
+
+        // [MOCK DATA]
+        const MOCK_SCENARIOS = [
+            {
+                filename: "malware_sample_01.exe",
+                message: "랜섬웨어 패턴 감지됨 (WannaCry variant)",
+                score: 9.8, status: "CRITICAL", report_url: "#",
+                yara: [
+                    {
+                        rule_name: "Ransomware_WannaCry",
+                        severity: "Critical",
+                        description: "Detects the common mutex and DLL loading calls used by the WannaCry ransomware variant.",
+                        match_data: "CreateMutex(null, 1, \"Global\\MsWinZonesCacheCounterMutexA\")",
+                        offset: "0x0002C10",
+                        author: "SOC-Threat Intel",
+                        reference: "MITRE ATT&CK T1486 (Data Encrypted)"
+                    },
+                    {
+                        rule_name: "Suspicious_Packer",
+                        severity: "High",
+                        description: "Identifies known commercial and proprietary packing layers (UPX, ASProtect) to evade static analysis.",
+                        match_data: "UPX!\\x00...",
+                        offset: "0x000002E0",
+                        author: "Internal Analysis Team",
+                        reference: "T1027 (Obfuscated Files or Information)"
+                    }
+                ],
+                ai_summary: "1. 식별: 사용자 파일을 암호화하고 금전을 요구하는 랜섬웨어(WannaCry 변종)임.\n2. 위험: 네트워크를 통해 전파되며 시스템 마비 및 중요 데이터 영구 손실 위험이 있음.\n3. 대응: 감염된 호스트를 즉시 네트워크에서 격리하고 백업본으로 복구를 권장함."
+            },
+            {
+                filename: "[Network] Reverse Shell Connection",
+                message: "비정상적인 아웃바운드 쉘 연결 시도 (Port 4444)",
+                score: 8.5, status: "CRITICAL", report_url: "#",
+                yara: [],
+                ai_summary: "1. 식별: 내부 서버에서 외부 공격자 서버로 역연결을 시도하는 리버스 쉘 공격임.\n2. 위험: 방화벽을 우회하여 공격자가 내부 시스템의 제어권을 완전히 탈취할 수 있음.\n3. 대응: 해당 세션을 즉시 강제 종료하고 아웃바운드 포트 정책을 점검해야 함."
+            },
+            {
+                filename: "webshell_cmd.php",
+                message: "웹쉘 업로드 및 실행 시도 탐지",
+                score: 8.5, status: "CRITICAL", report_url: "#",
+                yara: [
+                    {
+                        rule_name: "PHP_Webshell_Generic",
+                        severity: "High",
+                        description: "Detects common PHP functions used for arbitrary command execution via web requests (e.g., system, exec).",
+                        match_data: "$_GET['cmd']",
+                        offset: "0x00000045",
+                        author: "WebSec Team",
+                        reference: "T1505.003 (Web Shell)"
+                    },
+                    {
+                        rule_name: "Exploit_Kit_A",
+                        severity: "Medium",
+                        description: "Matches signatures related to a specific exploit kit targeting legacy CMS vulnerabilities.",
+                        match_data: "if (isset($_POST['id']))",
+                        offset: "0x00000102",
+                        author: "External Feed",
+                        reference: "CVE-2023-xxxx"
+                    }
+                ],
+                ai_summary: "1. 식별: 공격자가 웹 서버를 원격 제어할 수 있는 백도어(Webshell) 스크립트임.\n2. 위험: 관리자 권한 탈취, 데이터베이스 유출 및 추가 악성코드 다운로드 통로가 됨.\n3. 대응: 해당 파일 즉시 삭제 및 웹 애플리케이션 취약점 패치 적용이 필수임."
+            },
+            {
+                filename: "test_file.txt",
+                message: "특이사항 없음",
+                score: 0.5, status: "CLEAN", report_url: "#",
+                yara: [],
+                ai_summary: "1. 식별: 악성 행위나 위험한 코드가 포함되지 않은 일반 텍스트 파일임.\n2. 위험: 샌드박스 실행 결과 특이사항 없음 (Clean).\n3. 대응: 별도의 보안 조치가 불필요함."
+            }
+        ];
+
+        const MOCK_FALCO_EVENTS = [
+            {
+                "event_id": "exec-inter-12345",
+                "timestamp": "2025-12-30T15:56:09Z",
+                "threat_metadata": {
+                    "rule": "Terminal shell in container",
+                    "priority": "Critical",
+                    "pod_name": "dvwa-deployment-54885586cd-zv5df",
+                    "namespace": "dvwa",
+                    "attacker_ip": "10.0.0.36",
+                    "target_cmd": "bash /var/www/html/exploit.sh"
+                },
+                "response_status": {
+                    "state": "RUNNING",
+                    "current_action": "Isolating Pod Network via NetworkPolicy",
+                    "step_functions_arn": "arn:aws:states:us-east-1:1234:execution:SHIELD-SOAR:...",
+                    "start_time": "2025-12-30T15:56:10Z",
+                    "completion_time": null
+                },
+                "display_flags": {
+                    "is_active_incident": true,
+                    "ui_alert_level": "RED"
+                }
+            },
+            {
+                "event_id": "file-write-etc-shadow",
+                "timestamp": "2025-12-30T16:01:22Z",
+                "threat_metadata": {
+                    "rule": "Write below /etc",
+                    "priority": "Critical",
+                    "pod_name": "auth-service-7d9b8c-5f2as",
+                    "namespace": "production",
+                    "attacker_ip": "unknown",
+                    "target_cmd": "cp /tmp/shadow.bak /etc/shadow"
+                },
+                "response_status": {
+                    "state": "RUNNING",
+                    "current_action": "Terminating Pod (Force Kill)",
+                    "step_functions_arn": "arn:aws:states:us-east-1:1234:execution:SHIELD-SOAR:...",
+                    "start_time": "2025-12-30T16:01:23Z",
+                    "completion_time": null
+                },
+                "display_flags": {
+                    "is_active_incident": true,
+                    "ui_alert_level": "RED"
+                }
+            },
+            {
+                "event_id": "outbound-conn-miner",
+                "timestamp": "2025-12-30T16:15:45Z",
+                "threat_metadata": {
+                    "rule": "Outbound Connection to Miner Pool",
+                    "priority": "High",
+                    "pod_name": "jenkins-agent-01",
+                    "namespace": "ci-cd",
+                    "attacker_ip": "45.33.22.11",
+                    "target_cmd": "xmrig -o stratum+tcp://..."
+                },
+                "response_status": {
+                    "state": "PENDING",
+                    "current_action": "Blocking IP via Security Group",
+                    "step_functions_arn": "arn:aws:states:us-east-1:1234:execution:SHIELD-SOAR:...",
+                    "start_time": "2025-12-30T16:15:46Z",
+                    "completion_time": null
+                },
+                "display_flags": {
+                    "is_active_incident": true,
+                    "ui_alert_level": "RED"
+                }
+            },
+            {
+                "event_id": "sensitive-file-read",
+                "timestamp": "2025-12-30T16:22:11Z",
+                "threat_metadata": {
+                    "rule": "Read sensitive file untrusted",
+                    "priority": "Warning",
+                    "pod_name": "web-frontend-5d8f9c-7x9z2",
+                    "namespace": "frontend",
+                    "attacker_ip": "10.0.2.15",
+                    "target_cmd": "cat /etc/shadow"
+                },
+                "response_status": null,
+                "display_flags": { "is_active_incident": false, "ui_alert_level": "AMBER" }
+            },
+            {
+                "event_id": "k8s-api-access",
+                "timestamp": "2025-12-30T16:30:05Z",
+                "threat_metadata": {
+                    "rule": "Contact K8S API Server",
+                    "priority": "Notice",
+                    "pod_name": "debug-tool-1a2b3c",
+                    "namespace": "monitoring",
+                    "attacker_ip": "Internal",
+                    "target_cmd": "kubectl get secrets"
+                },
+                "response_status": null,
+                "display_flags": { "is_active_incident": false, "ui_alert_level": "CYAN" }
+            },
+            {
+                "event_id": "container-priv-escalation",
+                "timestamp": "2025-12-30T16:45:33Z",
+                "threat_metadata": {
+                    "rule": "Launch Privileged Container",
+                    "priority": "Critical",
+                    "pod_name": "db-backup-job-88f7d6",
+                    "namespace": "database",
+                    "attacker_ip": "172.16.0.5",
+                    "target_cmd": "docker run --privileged ..."
+                },
+                "response_status": {
+                    "state": "SUCCEEDED",
+                    "current_action": "Container Paused",
+                    "step_functions_arn": "arn:aws:states:us-east-1:...",
+                    "start_time": "2025-12-30T16:45:35Z",
+                    "completion_time": "2025-12-30T16:45:40Z"
+                },
+                "display_flags": { "is_active_incident": true, "ui_alert_level": "RED" }
+            },
+            {
+                "event_id": "debug-shell-spawn",
+                "timestamp": "2025-12-30T17:01:10Z",
+                "threat_metadata": {
+                    "rule": "Shell in container",
+                    "priority": "Debug",
+                    "pod_name": "test-pod-1",
+                    "namespace": "default",
+                    "attacker_ip": "127.0.0.1",
+                    "target_cmd": "/bin/sh"
+                },
+                "response_status": null,
+                "display_flags": { "is_active_incident": false, "ui_alert_level": "GREY" }
+            }
+        ];
+
+        // --- COMPONENTS ---
+
+        const Header = ({ isSimulating, toggleSim, reset }) => (
+            <header className="flex justify-between items-center h-16 px-6 glass-box rounded-xl shrink-0">
+                <div className="flex items-center gap-3">
+                    <i className="fas fa-shield-halved text-2xl text-[var(--primary)] animate-pulse drop-shadow-[0_0_10px_var(--primary)]"></i>
+                    <div>
+                        <h1 className="text-xl font-black tracking-[0.2em] text-white leading-none">
+                            5<span className="text-[var(--primary)] text-glow-blue">entinel</span>
+                        </h1>
+                        <p className="text-[10px] text-slate-400 font-mono tracking-widest mt-0.5 font-bold">INTEGRATED SECURITY OPERATIONS CENTER</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="flex gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${isSimulating ? 'bg-green-500' : 'bg-red-500'} animate-bounce shadow-[0_0_10px_currentColor]`}></span>
+                        <span className={`w-2 h-2 rounded-full ${isSimulating ? 'bg-green-500' : 'bg-red-500'} animate-bounce delay-75 shadow-[0_0_10px_currentColor]`}></span>
+                        <span className={`w-2 h-2 rounded-full ${isSimulating ? 'bg-green-500' : 'bg-red-500'} animate-bounce delay-150 shadow-[0_0_10px_currentColor]`}></span>
+                    </div>
+
+                    <button
+                        onClick={toggleSim}
+                        className={`px-5 py-2 text-xs font-black font-mono tracking-widest border-2 transition-all rounded-md flex items-center gap-2 shadow-lg
+                        ${isSimulating
+                                ? 'border-slate-500 text-slate-400 bg-slate-900/50'
+                                : 'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary)]/10 hover:bg-[var(--primary)] hover:text-black hover:shadow-[0_0_20px_var(--primary)]'}`}
+                    >
+                        <i className={`fas ${isSimulating ? 'fa-pause' : 'fa-play'}`}></i>
+                        {isSimulating ? 'PAUSE DEMO' : 'START DEMO'}
+                    </button>
+
+                    <button
+                        onClick={reset}
+                        className="w-9 h-9 flex items-center justify-center border border-slate-600 text-slate-400 hover:border-white hover:text-white rounded-md transition-all hover:bg-white/10"
+                        title="Clear All Data"
+                    >
+                        <i className="fas fa-trash-can text-sm"></i>
+                    </button>
+                </div>
+            </header>
+        );
+
+        const PipelineBar = ({ stage }) => {
+            const steps = [
+                { id: 1, label: "DETECTION", icon: "fa-eye" },
+                { id: 2, label: "AUTO-RESPONSE", icon: "fa-shield-virus" },
+                { id: 3, label: "ISOLATION", icon: "fa-lock" },
+                { id: 4, label: "ANALYSIS", icon: "fa-magnifying-glass-chart" },
+                { id: 5, label: "REPORT", icon: "fa-file-circle-check" }
+            ];
+
+            return (
+                <div className="glass-box rounded-2xl px-16 flex justify-between items-center relative overflow-hidden shrink-0 h-32"> {/* h-32 복원 */}
+                    <div className="absolute top-1/2 left-24 right-24 h-1.5 -translate-y-1/2 z-0 rounded-full bg-slate-800">
+                        <div
+                            className="h-full bg-[var(--primary)] rounded-full transition-all duration-500 shadow-[0_0_15px_var(--primary)]"
+                            style={{ width: `${Math.max(0, (stage - 1) * 25)}%` }}
+                        ></div>
+                    </div>
+
+                    {steps.map((s) => {
+                        const active = stage >= s.id;
+                        const current = stage === s.id;
+                        return (
+                            <div key={s.id} className="flex flex-col items-center gap-3 relative z-10">
+                                <div className={`w-12 h-12 rounded-xl bg-[#0a0f14] border-2 flex items-center justify-center transition-all duration-300
+                                    ${active ? 'border-[var(--primary)] text-[var(--primary)] shadow-[0_0_20px_rgba(0,240,255,0.4)] scale-110' : 'border-slate-700 text-slate-600'}
+                                    ${current ? 'animate-pulse bg-[var(--primary)] text-black' : ''}
+                                `}>
+                                    <i className={`fas ${s.icon} text-xl`}></i>
+                                </div>
+                                <span className={`text-xs font-bold tracking-widest mt-1 ${active ? 'text-white' : 'text-slate-600'}`}>{s.label}</span>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        };
+
+        const RadarPanel = ({ data, isAnalyzing }) => {
+            const getThreatStatus = (score) => {
+                if (!data || score === undefined || score === null) {
+                    return { status: 'UNKNOWN', colorClass: 'text-slate-400', glowClass: '' };
+                }
+
+                let status, color, glow;
+
+                if (score >= 9.0) {
+                    status = 'CRITICAL'; color = 'text-[var(--alert)]'; glow = 'shadow-[0_0_15px_var(--alert)]';
+                } else if (score >= 7.0) {
+                    status = 'HIGH'; color = 'text-red-400'; glow = 'shadow-[0_0_15px_rgba(255,0,0,0.7)]';
+                } else if (score >= 4.0) {
+                    status = 'MEDIUM'; color = 'text-amber-400'; glow = 'shadow-[0_0_10px_rgba(255,193,7,0.7)]';
+                } else if (score > 0.0) {
+                    status = 'LOW'; color = 'text-[var(--primary)]'; glow = 'shadow-[0_0_10px_var(--primary)]';
+                } else {
+                    status = 'CLEAN'; color = 'text-[var(--success)]'; glow = 'shadow-[0_0_10px_var(--success)]';
+                }
+
+                return { status, colorClass: color, glowClass: glow, rawScore: score };
+            };
+
+            const threat = getThreatStatus(data?.score);
+            const isYaraComplete = data?.status === 'yara_complete';
+
+            return (
+                <div className="glass-box rounded-2xl p-0 flex flex-col relative overflow-hidden h-full">
+                    <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/40 shrink-0">
+                        <span className="text-lg font-bold text-[var(--primary)] tracking-widest flex items-center">
+                            <i className="fas fa-satellite-dish mr-3"></i>THREAT RADAR
+                        </span>
+                        {isAnalyzing && <span className="text-[10px] text-red-500 animate-pulse font-bold tracking-wider uppercase">Tracking...</span>}
+                    </div>
+
+                    <div className="flex-1 flex flex-col items-center justify-center p-2 relative min-h-0 overflow-y-auto">
+                        {/* Radar Circle - Resized to fit */}
+                        <div className="w-48 h-48 border border-slate-600 rounded-full relative flex items-center justify-center bg-[radial-gradient(circle,rgba(0,240,255,0.05)_0%,transparent_70%)] mb-4 shrink-0">
+                            <div className="absolute inset-0 rounded-full border border-slate-700 scale-75"></div>
+                            <div className="absolute inset-0 rounded-full border border-slate-700 scale-50"></div>
+                            <div className="absolute w-[1px] h-full bg-slate-700"></div>
+                            <div className="absolute h-[1px] w-full bg-slate-700"></div>
+
+                            {isAnalyzing && <div className="absolute inset-0 radar-sweep"></div>}
+
+                            {data && !isAnalyzing && (
+                                <div className={`absolute w-3 h-3 rounded-full animate-ping ${threat.colorClass} ${threat.glowClass}`}
+                                    style={{ top: '30%', right: '30%' }}
+                                ></div>
+                            )}
+
+                            <div className="z-10 text-center flex flex-col items-center">
+                                {isAnalyzing || isYaraComplete ? (
+                                    <div className="text-xl text-[var(--primary)] font-black font-mono animate-pulse drop-shadow-[0_0_10px_var(--primary)]">
+                                        {isYaraComplete ? 'PENDING' : 'ANALYZING'}
+                                    </div>
+                                ) : data ? (
+                                    <>
+                                        <div className={`text-6xl font-black ${threat.colorClass}`} style={{ filter: `drop-shadow(0 0 10px ${threat.colorClass})` }}>
+                                            {data.score}
+                                        </div>
+                                        <div className={`text-lg font-black italic uppercase mt-1 ${threat.colorClass}`}>
+                                            {threat.status}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="text-xs text-slate-500 font-mono animate-pulse font-bold">SCANNING</div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="w-full text-center px-4 shrink-0">
+                            <div className="text-[10px] text-slate-500 font-bold uppercase mb-1 tracking-wide">Target Artifact</div>
+                            <div className="bg-white/5 border border-white/10 py-2 px-3 rounded-lg font-mono text-xs text-[var(--primary)] truncate shadow-inner mb-3">
+                                {data?.filename || "Waiting for signal..."}
+                            </div>
+
+                            {!isAnalyzing && data?.report_url && (
+                                <a
+                                    href={data.report_url}
+                                    target="_blank"
+                                    className="block w-full py-2 bg-[var(--secondary)] hover:bg-purple-600 text-white rounded-lg font-bold text-xs shadow-lg transition-all uppercase tracking-wider text-center"
+                                >
+                                    <i className="fas fa-file-contract mr-2"></i> View Report
+                                </a>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const getYaraColor = (severity) => {
+            const level = severity.toLowerCase();
+            switch (level) {
+                case 'critical':
+                case 'high':
+                    return 'bg-red-500/20 text-red-400 border-red-500/30';
+                case 'medium':
+                    return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+                case 'low':
+                case 'informational':
+                    return 'bg-green-500/20 text-green-400 border-green-500/30';
+                default:
+                    return 'bg-slate-700/50 text-slate-400 border-slate-600/50';
+            }
+        };
+
+        const AnalysisPanel = ({ data, isAnalyzing, stage }) => {
+            const [expandedRule, setExpandedRule] = useState(null);
+            const toggleRuleExpansion = (ruleName) => {
+                setExpandedRule(prev => (prev === ruleName ? null : ruleName));
+            };
+
+            const showAiSummary = stage >= 4;
+            const showYara = stage >= 3;
+            const yaraMatches = data?.yara || [];
+
+            return (
+                <div className="glass-box rounded-2xl p-0 h-full flex flex-col">
+                    <div className="p-5 border-b border-white/10 bg-black/40">
+                        <span className="text-xl font-bold text-[var(--secondary)] tracking-widest flex items-center">
+                            <i className="fas fa-microchip mr-3"></i>INTELLIGENCE ANALYSIS
+                        </span>
+                    </div>
+
+                    <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto">
+
+
+                        {/* --- 중간: AI 요약 섹션 --- */}
+                        <div>
+                            <h4 className="text-lg text-purple-400 font-bold mb-3 flex items-center gap-2 tracking-wide uppercase">
+                                <i className="fas fa-brain"></i> Gemini AI Summary
+                            </h4>
+                            <div className="bg-[#0f0f15] border border-slate-700 rounded-lg p-5 text-base leading-relaxed text-slate-300 shadow-inner min-h-[140px] whitespace-pre-wrap font-sans">
+                                {showAiSummary ? (
+                                    (isAnalyzing && !data?.ai_summary) ? (
+                                        <span className="animate-pulse text-cyan-500 flex items-center gap-2">
+                                            <i className="fas fa-spinner fa-spin"></i> 정밀 분석 엔진 가동 중...
+                                        </span>
+                                    ) : (data?.ai_summary || <span className="text-slate-600 italic">분석 리포트 생성 대기 중</span>)
+                                ) : (
+                                    <span className="text-slate-600 opacity-50">동적 분석(Cuckoo) 결과 대기 중...</span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* --- 하단: YARA 매치 섹션 --- */}
+                        <div className="flex-1">
+                            <h4 className="text-lg text-green-400 font-bold mb-3 flex items-center gap-2 tracking-wide">
+                                <i className="fas fa-code"></i> YARA MATCHES
+                            </h4>
+
+                            <div className="grid grid-cols-12 gap-4 text-base text-slate-400 font-bold mb-2 px-2 uppercase tracking-wider border-b border-white/5 pb-1">
+                                <div className="col-span-5 pl-2">Rule Name</div>
+                                <div className="col-span-3 text-center">Severity</div>
+                                <div className="col-span-4 text-right pr-2">Evidence</div>
+                            </div>
+
+                            <div className="space-y-2">
+                                {!showYara ? (
+                                    <div className="text-sm text-slate-600 italic border border-dashed border-slate-800 p-6 rounded-lg text-center">
+                                        분석이 시작되면 결과가 여기에 표시됩니다
+                                    </div>
+                                ) : yaraMatches.length > 0 ? (
+                                    yaraMatches.map((rule, idx) => (
+                                        <React.Fragment key={`${rule.rule_name}-${idx}`}>
+                                            <div
+                                                onClick={() => toggleRuleExpansion(rule.rule_name)}
+                                                className={`grid grid-cols-12 gap-4 items-center p-4 rounded-lg transition-colors group cursor-pointer 
+                                                    ${expandedRule === rule.rule_name
+                                                        ? 'bg-white/10 border border-[var(--secondary)]/50'
+                                                        : 'bg-white/5 border border-white/10 hover:border-[var(--success)]/50'
+                                                    }`}
+                                            >
+                                                <div className="col-span-5 text-sm font-bold text-slate-200 font-mono truncate">
+                                                    {rule.rule_name}
+                                                </div>
+                                                <div className="col-span-3 text-center">
+                                                    <span className={`text-sm px-3 py-1.5 rounded font-bold uppercase tracking-wide ${getYaraColor(rule.severity)}`}>
+                                                        {rule.severity}
+                                                    </span>
+                                                </div>
+                                                <div className="col-span-4 text-right text-sm text-slate-400 truncate font-medium">
+                                                    {rule.match_data || 'N/A'}
+                                                </div>
+                                            </div>
+                                            {expandedRule === rule.rule_name && (
+                                                <div className="bg-[#1a0c2e] p-5 rounded-lg ml-3 mr-3 text-xs font-mono border-l-4 border-[var(--secondary)] shadow-2xl space-y-3">
+                                                    <div className="border-b border-white/10 pb-3">
+                                                        <strong className="text-white text-sm block mb-1">{rule.description || 'N/A'}</strong>
+
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-6 text-sm">
+                                                        <div>
+                                                            <strong className="text-white block mb-1">File Offset</strong>
+                                                            <span className="text-[var(--primary)]">{rule.offset || '0x0'}</span>
+                                                        </div>
+                                                        <div>
+                                                            <strong className="text-white block mb-1">Match String</strong>
+                                                            <code className="text-red-300 break-all">{rule.match_data || 'N/A'}</code>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </React.Fragment>
+                                    ))
+                                ) : (
+                                    <div className="text-sm text-slate-500 italic border border-dashed border-slate-800 p-6 rounded-lg text-center animate-pulse">
+                                        {isAnalyzing ? "실시간 스캔 중... (현재까지 탐지된 룰 없음)" : "No YARA signatures matched"}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const LogPanel = ({ logs }) => {
+            return (
+                <div className="glass-box rounded-2xl p-0 h-full flex flex-col bg-black/40">
+                    <div className="p-5 border-b border-white/10 flex justify-between items-center bg-black/40">
+                        <span className="text-xl font-bold text-slate-300 tracking-widest flex items-center">
+                            <i className="fas fa-terminal mr-3"></i>SYSTEM LOGS
+                        </span>
+                        <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_lime]"></div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-1.5 font-mono text-xs scroll-smooth">
+                        {logs.length === 0 && <div className="text-slate-600 italic text-center mt-10 text-sm">System Ready...</div>}
+                        {logs.map((log) => (
+                            <div key={log.id} className="grid grid-cols-[65px_60px_1fr] gap-2 hover:bg-white/5 p-1.5 rounded transition-colors items-start border-l-2 border-transparent hover:border-[var(--primary)]">
+                                <span className="text-slate-500 shrink-0 select-none font-bold">[{log.time}]</span>
+                                <span className={`font-bold text-center shrink-0 ${log.type === 'CRITICAL' ? 'text-red-500' :
+                                    log.type === 'INFO' ? 'text-blue-400' :
+                                        log.type === 'WARN' ? 'text-yellow-400' : 'text-green-500'
+                                    }`}>{log.type}</span>
+                                <span className="text-slate-300 break-all leading-tight text-[11px]">{log.msg}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const FalcoPanel = ({ falcoStatus }) => {
+            const getPriorityStyle = (priority) => {
+                const p = (priority || 'UNKNOWN').toUpperCase();
+                switch (p) {
+                    case 'CRITICAL': return 'text-[var(--alert)] bg-red-500/10 border-red-500/50 shadow-[0_0_10px_rgba(255,0,0,0.2)]';
+                    case 'WARNING': return 'text-amber-500 bg-amber-500/10 border-amber-500/50';
+                    case 'NOTICE': return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/50';
+                    case 'DEBUG': return 'text-slate-400 bg-slate-500/10 border-slate-500/50';
+                    case 'INFO': return 'text-blue-400 bg-blue-500/10 border-blue-500/50';
+                    default: return 'text-white bg-white/10 border-white/20';
+                }
+            };
+
+            return (
+                <div className={`glass-box rounded-2xl p-0 h-full flex flex-col transition-all duration-500 ${falcoStatus?.display_flags?.is_active_incident ? 'shadow-[0_0_30px_rgba(255,0,60,0.1)] border-red-500/30' : 'bg-black/40'}`}>
+                    <div className="p-5 border-b border-white/10 flex justify-between items-center shrink-0 bg-black/20">
+                        <span className="text-xl font-bold text-[var(--alert)] tracking-widest flex items-center animate-pulse">
+                            <i className="fas fa-shield-virus mr-3"></i>FALCO SECURITY
+                        </span>
+                        {falcoStatus?.display_flags?.is_active_incident &&
+                            <span className="bg-red-500/10 border border-red-500/50 text-red-500 text-[10px] px-2 py-0.5 rounded font-bold tracking-wider animate-pulse shadow-[0_0_10px_rgba(255,0,0,0.2)]">
+                                • ACTIVE
+                            </span>
+                        }
+                    </div>
+
+                    <div className="flex-1 p-5 overflow-y-auto font-mono text-xs relative">
+                        {falcoStatus ? (
+                            <div className="space-y-6 h-full">
+                                {/* Header Info */}
+                                <div className="flex justify-between items-start">
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-slate-400 font-bold text-xs">EVENT ID</span>
+                                            <span className="text-slate-200 font-mono">{falcoStatus.event_id || 'N/A'}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-slate-500 text-[10px]">{falcoStatus.timestamp}</span>
+                                        </div>
+                                    </div>
+                                    <span className={`font-black uppercase text-sm border px-3 py-1 rounded-md ${getPriorityStyle(falcoStatus.threat_metadata?.priority)}`}>
+                                        {falcoStatus.threat_metadata?.priority || 'High'}
+                                    </span>
+                                </div>
+
+                                {/* Threat Metadata Grid - Clean Look */}
+                                <div className="grid grid-cols-1 gap-4 bg-white/5 p-4 rounded-xl border border-white/5">
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-slate-500 font-bold text-[10px] tracking-wider">DETECTED RULE</span>
+                                        <span className="text-white font-bold text-sm bg-red-500/10 p-2 rounded border-l-2 border-red-500">
+                                            {falcoStatus.threat_metadata?.rule || 'Unknown'}
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-slate-500 font-bold text-[10px] tracking-wider">ATTACKER IP</span>
+                                            <span className="text-[var(--primary)] font-mono text-sm">{falcoStatus.threat_metadata?.attacker_ip || 'N/A'}</span>
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-slate-500 font-bold text-[10px] tracking-wider">TARGET CMD</span>
+                                            <code className="text-red-300 break-all text-[11px] bg-black/30 px-2 py-1 rounded border border-white/5">
+                                                {falcoStatus.threat_metadata?.target_cmd || 'N/A'}
+                                            </code>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-slate-500 font-bold text-[10px] tracking-wider">AFFECTED POD</span>
+                                        <div className="flex items-center gap-2 text-slate-300 text-xs">
+                                            <i className="fas fa-cube text-slate-600"></i>
+                                            {falcoStatus.threat_metadata?.pod_name}
+                                            <span className="text-slate-600">({falcoStatus.threat_metadata?.namespace})</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Response Status (SOAR) */}
+                                {falcoStatus.response_status && (
+                                    <div className={`border rounded-xl p-4 transition-colors ${falcoStatus.response_status.state === 'RUNNING'
+                                        ? 'bg-amber-500/5 border-amber-500/20'
+                                        : falcoStatus.response_status.state === 'SUCCEEDED'
+                                            ? 'bg-green-500/5 border-green-500/20'
+                                            : 'bg-white/5 border-white/5'
+                                        }`}>
+                                        <div className="flex justify-between items-center mb-3">
+                                            <span className={`font-bold flex items-center gap-2 ${falcoStatus.response_status.state === 'RUNNING' ? 'text-amber-400' : 'text-green-400 font-bold'
+                                                }`}>
+                                                <i className="fas fa-robot"></i>
+                                                AUTOMATED RESPONSE
+                                            </span>
+                                            <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${falcoStatus.response_status.state === 'RUNNING'
+                                                ? 'bg-amber-500/20 text-amber-500 animate-pulse'
+                                                : 'bg-green-500/20 text-green-500'
+                                                }`}>
+                                                {falcoStatus.response_status.state}
+                                            </span>
+                                        </div>
+                                        <div className="text-slate-300 text-[11px] flex items-start gap-2">
+                                            <i className="fas fa-arrow-right text-slate-600 mt-1"></i>
+                                            <span className="font-medium text-slate-200 leading-tight">
+                                                {falcoStatus.response_status.current_action}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Raw JSON Details */}
+                                <details className="group pt-4 border-t border-white/10">
+                                    <summary className="cursor-pointer text-slate-600 hover:text-slate-400 text-[10px] font-bold tracking-wider list-none flex items-center gap-2 uppercase transition-colors">
+                                        <i className="fas fa-chevron-right group-open:rotate-90 transition-transform text-[var(--primary)]"></i>
+                                        Raw Telemetry Data
+                                    </summary>
+                                    <pre className="mt-3 text-[10px] text-slate-500 whitespace-pre-wrap break-all bg-black/50 p-3 rounded-lg border border-white/5 max-h-[150px] overflow-y-auto custom-scrollbar shadow-inner">
+                                        {JSON.stringify(falcoStatus, null, 2)}
+                                    </pre>
+                                </details>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-full opacity-30 space-y-4">
+                                <div className="w-20 h-20 rounded-full border-2 border-slate-700 flex items-center justify-center">
+                                    <i className="fas fa-shield-halved text-4xl text-slate-700"></i>
+                                </div>
+                                <span className="text-slate-500 font-bold tracking-widest text-sm">SYSTEM SECURE</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- MAIN APP ---
+        const App = () => {
+            const [analysisData, setAnalysisData] = useState(null);
+            const [falcoStatus, setFalcoStatus] = useState(null);
+            const [clearedFalcoId, setClearedFalcoId] = useState(null);
+
+            const [isSimulating, setIsSimulating] = useState(false);
+            const [clearedTimestamp, setClearedTimestamp] = useState(localStorage.getItem('shield_cleared_ts') || null);
+            const [stage, setStage] = useState(0);
+            const [data, setData] = useState(null);
+            const [logs, setLogs] = useState(() => {
+                try {
+                    return JSON.parse(localStorage.getItem('shield_logs') || '[]');
+                } catch (e) {
+                    console.error("Failed to parse logs from localStorage", e);
+                    return [];
+                }
+            });
+
+            const lastStatusIdRef = useRef(null);
+            const lastAnalysisTsRef = useRef(null);
+
+            const simStepRef = useRef(0);
+            const simScenarioRef = useRef(null);
+            const timerRef = useRef(null);
+
+            useEffect(() => localStorage.setItem('shield_logs', JSON.stringify(logs)), [logs]);
+
+            const addLog = (type, msg) => {
+                setLogs(prev => {
+                    if (prev.length > 0 && prev[0].msg === msg && (Date.now() - prev[0].id < 2000)) {
+                        return prev;
+                    }
+                    const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+                    return [{ id: Date.now(), time, type, msg }, ...prev].slice(0, 50);
+                });
+            };
+
+            const fetchAnalysisData = async () => {
+                if (isSimulating || simScenarioRef.current) return;
+                try {
+                    const res = await fetch(`${DATA_URL}?t=${Date.now()}`);
+                    if (!res.ok) return;
+                    const json = await res.json();
+
+                    const lastCleared = localStorage.getItem('shield_cleared_ts');
+                    if (lastCleared && json.timestamp === lastCleared) {
+                        if (data) { setData(null); setStage(0); }
+                        return;
+                    }
+
+                    if (!data || json.timestamp !== data.timestamp) {
+                        setData(json)
+                    }
+
+                    const status = json.status ? json.status.toUpperCase() : ""
+                    if (status === 'YARA_COMPLETE') setStage(3)
+                    else if (status === 'ANALYZING') setStage(4)
+                    else if (['CRITICAL', 'WARNING', 'CLEAN', 'SUCCESS', 'COMPLETE', 'ERROR'].includes(status)) setStage(5)
+                    else if (status) setStage(1)
+
+                    if (json.status === 'ERROR') addLog('CRITICAL', `System Alert: ${json.ai_summary}`);
+                } catch (e) {
+                    console.error("Fetch failed", e);
+                }
+            };
+
+            const fetchFalcoStatus = async () => {
+                if (isSimulating) return
+                try {
+                    const res = await fetch(`${STATUS_URL}?t=${Date.now()}`)
+                    if (!res.ok) return
+                    const statusJson = await res.json()
+
+                    if (statusJson.event_id === clearedFalcoId) return;
+
+                    if (statusJson.event_id !== lastStatusIdRef.current) {
+                        setFalcoStatus(statusJson)
+                        lastStatusIdRef.current = statusJson.event_id
+                        addLog('CRITICAL', `[FALCO] 런타임 위협 감지: ${statusJson.threat_metadata.rule}`)
+
+                        setStage(1);
+                    } else {
+                        setFalcoStatus(statusJson)
+                    }
+                    if (statusJson.response_status) {
+                        const s = statusJson.response_status.state;
+                        if (s === 'RUNNING' && stage < 2) setStage(2);
+                        if (s === 'SUCCEEDED' && stage < 3) setStage(3);
+                    }
+
+                } catch (e) { console.error("Falco Status fetch failed", e) }
+            }
+
+            useEffect(() => {
+                fetchAnalysisData();
+                fetchFalcoStatus();
+                const interval = setInterval(() => {
+                    fetchAnalysisData();
+                    fetchFalcoStatus();
+                }, 3000);
+                return () => clearInterval(interval);
+            }, [isSimulating, clearedTimestamp, data?.timestamp, clearedFalcoId]);
+
+            const resetDashboard = () => {
+                if (data?.timestamp) {
+                    localStorage.setItem('shield_cleared_ts', data.timestamp);
+                    setClearedTimestamp(data.timestamp);
+                }
+                simStepRef.current = 0;
+                localStorage.removeItem('shield_logs');
+                setLogs([]);
+                setData(null);
+                setClearedFalcoId(falcoStatus?.event_id);
+                setFalcoStatus(null);
+                setStage(0);
+                addLog('INFO', 'Dashboard history cleared');
+            };
+
+            const isEmergency = falcoStatus?.display_flags?.is_active_incident;
+
+            useEffect(() => {
+                if (!isSimulating) {
+                    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+                    return;
+                }
+                const runStep = () => {
+                    const currentStep = simStepRef.current;
+                    if (currentStep === 0) {
+                        simScenarioRef.current = MOCK_SCENARIOS[0];
+                        setStage(1); setData(null);
+                        addLog('WARN', `Intrusion Detected: ${simScenarioRef.current.filename}`);
+                        simStepRef.current++;
+                        timerRef.current = setTimeout(runStep, 1500);
+
+                    } else if (currentStep === 1) {
+                        setStage(2); setData({ ...simScenarioRef.current, status: 'SCANNING', score: 0 });
+
+                        const randomFalcoRaw = MOCK_FALCO_EVENTS[Math.floor(Math.random() * MOCK_FALCO_EVENTS.length)];
+                        const randomFalco = {
+                            ...randomFalcoRaw,
+                            response_status: {
+                                state: 'RUNNING',
+                                current_action: 'Evaluating Automated Response Rule...',
+                                start_time: new Date().toISOString()
+                            },
+                            display_flags: {
+                                ...randomFalcoRaw.display_flags,
+                                is_active_incident: true
+                            }
+                        }
+                        setFalcoStatus(randomFalco);
+
+                        addLog('INFO', `Falco: Runtime Threat Detected (${randomFalco.threat_metadata.rule})`);
+                        simStepRef.current++;
+                        timerRef.current = setTimeout(runStep, 2000);
+                    } else if (currentStep === 2) {
+                        setStage(3); addLog('INFO', 'Lambda: Quarantined');
+                        simStepRef.current++;
+                        timerRef.current = setTimeout(runStep, 1500);
+                    } else if (currentStep === 3) {
+                        setStage(4); addLog('INFO', 'Sandbox: Analyzing');
+                        simStepRef.current++;
+                        timerRef.current = setTimeout(runStep, 2000);
+                    } else if (currentStep === 4) {
+                        setStage(5); setData(simScenarioRef.current);
+                        addLog('CRITICAL', `Analysis Complete. Score: ${simScenarioRef.current.score}`);
+                        setIsSimulating(false);
+                        timerRef.current = setTimeout(runStep, 6000);
+                    }
+                };
+                runStep();
+                return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+            }, [isSimulating]);
+
+            return (
+                <>
+                    <Header isSimulating={isSimulating} toggleSim={() => {
+                        if (!isSimulating) {
+                            if (falcoStatus?.event_id) setClearedFalcoId(falcoStatus.event_id);
+                            if (stage === 5) {
+                                simStepRef.current = 0;
+                                setStage(0);
+                                setFalcoStatus(null);
+                                setData(null);
+                            }
+                        }
+                        setIsSimulating(!isSimulating);
+                    }} reset={resetDashboard} />
+                    <main className="flex-1 flex flex-col gap-4 overflow-hidden">
+                        <PipelineBar stage={stage} />
+                        <div className="flex-1 flex gap-4 min-h-0">
+                            <div className="w-[30%] min-w-[350px]">
+                                <FalcoPanel falcoStatus={falcoStatus} />
+                            </div>
+                            <div className="w-[35%]">
+                                <AnalysisPanel data={data} isAnalyzing={stage > 1 && stage < 5} stage={stage} />
+                            </div>
+                            <div className="flex-1 flex flex-col gap-4">
+                                <div className="h-[60%]">
+                                    <RadarPanel data={data} isAnalyzing={stage > 1 && stage < 5} />
+                                </div>
+                                <div className="h-[40%]">
+                                    <LogPanel logs={logs} />
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+
+                </>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
