@@ -108,10 +108,3 @@ npx serve .
 2.  **평시 상태**: 평시 모니터링 상태
 3.  **사고 발생**: 사고 시뮬레이션 시작 시 **즉시 긴급 모드(레드)** 전환
 4.  **대응 확인**: 상단 파이프라인 바에서 자동 대응 작업(IP 차단, 포드 격리 등) 실시간 확인
-
----
-
-## License
-
-This project is for **security education and monitoring purposes**.
-Licensed under the MIT License.
