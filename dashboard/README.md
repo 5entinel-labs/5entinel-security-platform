@@ -1,8 +1,8 @@
-# S.H.I.E.L.D Sentinel Dashboard
+# 5entinel Dashboard
 
 ### 통합 위협 방어 및 실시간 보안 모니터링 시스템
 
-**S.H.I.E.L.D (5entinel)** 는 정적/동적 파일 분석과 실시간 시스템 런타임 위협 탐지를 결합한 **통합 보안 관제 대시보드**임.
+**5entinel Dashboard** 는 정적/동적 파일 분석과 실시간 시스템 런타임 위협 탐지를 결합한 **통합 보안 관제 대시보드**임.
 YARA, Cuckoo Sandbox, Falco의 데이터를 시각화하고, **Gemini AI**를 통해 분석 요약을 제공하여 보안 분석가의 신속하고 정확한 의사결정을 지원함.
 
 ![Dashboard Preview](./dashboard_preview.png)
