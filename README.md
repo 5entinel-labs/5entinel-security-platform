@@ -76,7 +76,7 @@
 
 ## 4. 시스템 아키텍처 (Architecture)
 
-1.  **Detection**: EKS 내부의 **Falco**가 시스템 콜을 감지하여 Sidekick을 통해 로그 전송함
+1.  **Detection**: EKS 내부의 **Falco**가 시스템 콜을 감지하여 Fluent-Bit를 통해 로그 전송함
 2.  **Collection**: CloudWatch Logs로 수집된 로그가 Lambda 트리거함
 3.  **Automation**: **AWS Step Functions**가 대응 로직 실행 및 상태 갱신함 (`status.json`)
 4.  **Analysis**: 의심 파일은 S3 격리 버킷으로 전송되어 **Cuckoo/YARA** 분석 수행함 (`latest.json`)
@@ -100,7 +100,7 @@
 
 | 이름 | 역할 (Role) | 주요 기여 및 담당 파트 (Key Contributions) |
 | :---: | :---: | :--- |
-| **이영주** | **Team Leader** | (작성 필요) |
+| **이영주** | **Team Leader** | • AWS EKS, Step Function/Lambda 등 공격 환경 및 자동대응 구축<br>• Falco 런타임 보안 설정<br>• 최종 Report Discord 출력 |
 | **신유주** | **Member** | • Cuckoo Sandbox 구축 및 Gemini AI 분석 요약 자동화 연동<br>• 대시보드 UI/UX 설계<br>• 분석 브릿지 개발 및 S3 기반 데이터 파이프라인 구축 |
 | **이재일** | **Member** | • Falco 런타임 보안 설정 및 아키텍처 설계<br>• 리버스 쉘, 권한 상승 등 핵심 공격 시나리오 설계 및 검증 |
 | **이영광** | **Member** | • QA 수행 및 Unit Test 수행 |
