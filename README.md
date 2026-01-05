@@ -54,7 +54,6 @@
     * **Threat Radar**: 위협 점수에 따른 실시간 레이더 차트 시각화
     * **Emergency Mode**: 활성 위협 감지 시 붉은색 테마 전환으로 긴급 상황 전파함
 
-    ---
 
 ### 4) 검증된 공격 시나리오 (Validated Attack Scenarios)
 
