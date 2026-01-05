@@ -78,7 +78,7 @@ const REGION = "us-east-1"
 
 ### 1. 리포지토리 클론
 ```bash
-git clone https://github.com/your-username/5entinel-dashboard.git
+git clone https://github.com/5entinel-labs/5entinel-security-platform.git
 cd 5entinel-dashboard
 ```
 
