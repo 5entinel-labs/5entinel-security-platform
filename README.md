@@ -3,7 +3,7 @@
 **클라우드 네이티브 통합 SOC 및 실시간 위협 대응 생태계**
 
 **5ENTINEL (S.H.I.E.L.D)** 은 현대적인 클라우드(AWS/EKS) 환경을 보호하기 위해 설계된 차세대 통합 보안 관제 플랫폼임.
-단순한 모니터링을 넘어 런타임 행위 탐지(Falco), 정적/동적 파일 분석(YARA/Cuckoo), SOAR 자동 대응(Step Functions), 그리고 **AI 분석 지능(Gemini)**이 하나로 결합된 Full-Stack 보안 응대 시스템을 제공함.
+단순한 모니터링을 넘어 런타임 행위 탐지(Falco), 정적/동적 파일 분석(YARA/Cuckoo), SOAR 자동 대응(Step Functions), 그리고 **AI 분석 지능(Gemini)** 이 하나로 결합된 Full-Stack 보안 응대 시스템을 제공함.
 
 ![Dashboard Preview](./dashboard/dashboard_preview.png)
 
