@@ -1,0 +1,15 @@
+# Python Environments
+venv/
+.venv/
+__pycache__/
+
+# System Files
+.DS_Store
+
+# Artifacts & Results
+screenshots/
+*.mp4
+*.log
+
+# Optional: Malware Samples (If you want to generate them locally)
+# sample/
