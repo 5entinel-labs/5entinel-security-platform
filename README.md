@@ -76,6 +76,8 @@
 
 ## 4. 시스템 아키텍처 (Architecture)
 
+<img width="1803" height="722" alt="Image" src="https://github.com/user-attachments/assets/0e5747eb-35ba-446b-9a3c-9d6fdc4ca924" />
+
 1.  **Detection**: EKS 내부의 **Falco**가 시스템 콜을 감지하여 Fluent-Bit를 통해 로그 전송함
 2.  **Collection**: CloudWatch Logs로 수집된 로그가 Lambda 트리거함
 3.  **Automation**: **AWS Step Functions**가 대응 로직 실행 및 상태 갱신함 (`status.json`)
