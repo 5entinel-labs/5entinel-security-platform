@@ -90,8 +90,7 @@
 ├── AWS_SOAR/            # AWS Step Function 기반 자동 대응 시나리오
 ├── dashboard/           # React 기반 통합 관제 프론트엔드 (S3 호스팅)
 ├── cuckoo/              # 분석 브릿지 엔진 (bridge.py - YARA/AI 통합)
-├── falco/               # Falco 커스텀 룰(Rules) 및 Helm 설정
-└── test/                # 테스트 파일
+└── falco/               # Falco 커스텀 룰(Rules) 및 Helm 설정
 ```
 
 <br/>
@@ -102,7 +101,7 @@
 | 이름 | 역할 (Role) | 주요 기여 및 담당 파트 (Key Contributions) |
 | :---: | :---: | :--- |
 | **이영주** | **Team Leader** | • AWS EKS, Step Function/Lambda 등 공격 환경 및 자동대응 파이프라인 구축<br>• Falco 런타임 보안 설정<br>• 최종 Report Discord 출력 |
-| **신유주** | **Member** | • Cuckoo Sandbox 구축 및 Gemini AI 분석 요약 자동화 연동<br>• 대시보드 UI/UX 설계<br>• 분석 브릿지 개발 및 S3 기반 데이터 파이프라인 구축 |
+| **신유주** | **Member** | • Cuckoo Sandbox 구축 및 Gemini AI 분석 요약 자동화 연동<br>• 대시보드 UI/UX 설계 및 구현<br>• 분석 브릿지 개발 및 S3 기반 데이터 파이프라인 구축 |
 | **이재일** | **Member** | • Falco 런타임 보안 설정 및 아키텍처 설계<br>• 리버스 쉘, 권한 상승 등 핵심 공격 시나리오 설계 및 검증 |
 | **이영광** | **Member** | • QA 수행 및 Unit Test 수행 |
 | **홍정수** | **Member** | • 오픈소스 YARA 룰 최적화 및 탐지 자동화 구현<br>• PHP 리버스 셸 및 PowerShell 스크립트 난독화 탐지 룰 개발 |
