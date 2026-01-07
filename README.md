@@ -87,13 +87,17 @@
 <br/>
 
 ## 5. 프로젝트 구조 (Project Structure)
+
 ```code
-5entinel-platform/
+5entinel-security-platform/
 ├── AWS_SOAR/            # AWS Step Function 기반 자동 대응 시나리오
 ├── dashboard/           # React 기반 통합 관제 프론트엔드 (S3 호스팅)
 ├── cuckoo/              # 분석 브릿지 엔진 (bridge.py - YARA/AI 통합)
-└── falco/               # Falco 커스텀 룰(Rules) 및 Helm 설정
+├── falco/               # Falco 커스텀 룰(Rules) 및 Helm 설정
+├── yara/                # YARA 룰 및 악성코드 탐지 시그니처
+└── unit_test/           # 주요 기능 검증을 위한 테스트 코드
 ```
+
 
 <br/>
 
