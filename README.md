@@ -49,7 +49,11 @@
 | **Gemini AI** | • **Intel Summary**: 복잡한 YARA/Cuckoo 로그를 분석하여 **"3줄 요약"** 리포트 생성 (식별-위험-대응) |
 
 ### 3) 자동 대응 및 시각화 (SOAR & Dashboard)
-* **AWS Step Functions**: 탐지된 Pod를 즉시 격리(`Labeling`)하거나 강제 종료(`Force Delete`)하는 워크플로우 자동 실행함
+* **AWS Step Functions**:
+   * 치명적인 보안 이벤트가 발견된 Pod를 즉시 격리(`Labeling`)하거나 강제 중지
+   * 파일 업로드 시 파일 추출 및 실행 지연을 위한 전략 수행
+   * 일부 이벤트의 경우 관리자의 승인/거부를 요청한 뒤, 요청 값에 매칭된 대응 수행
+   * Reverse Shell 대응을 위한 NACL outbound Deny 정책 추가
 * **Dashboard Visualization**:
     * **Threat Radar**: 위협 점수에 따른 실시간 레이더 차트 시각화
     * **Emergency Mode**: 활성 위협 감지 시 붉은색 테마 전환으로 긴급 상황 전파함
